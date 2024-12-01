@@ -1,0 +1,22 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "Connect to your AMPECO EV Charger",
+                "description": "Please enter your AMPECO ChargePoint ID and authentication token.",
+                "data": {
+                    "chargepoint_id": "ChargePoint ID",
+                    "auth_token": "Authentication Token"
+                }
+            }
+        },
+        "error": {
+            "cannot_connect": "Failed to connect",
+            "invalid_auth": "Invalid authentication",
+            "unknown": "Unexpected error"
+        },
+        "abort": {
+            "already_configured": "Device is already configured"
+        }
+    }
+} 

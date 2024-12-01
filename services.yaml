@@ -1,0 +1,25 @@
+start_charging:
+  name: Start Charging
+  description: Start a charging session
+  target:
+    entity:
+      integration: ev_charger
+      domain: sensor
+  fields:
+    max_current:
+      name: Maximum Current
+      description: Maximum charging current in amperes
+      required: false
+      selector:
+        number:
+          min: 6
+          max: 32
+          unit_of_measurement: A
+
+stop_charging:
+  name: Stop Charging
+  description: Stop the current charging session
+  target:
+    entity:
+      integration: ev_charger
+      domain: sensor 
