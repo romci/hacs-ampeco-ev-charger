@@ -29,21 +29,21 @@ The integration provides several sensors:
 ## Services
 
 Two main services are provided:
-- `ev_charger.start_charging`: Start a charging session
-- `ev_charger.stop_charging`: Stop the current charging session
+- `ampeco_ev_charger.start_charging`: Start a charging session
+- `ampeco_ev_charger.stop_charging`: Stop the current charging session
 
-## Installation
+## Manual Installation
 
-1. Copy the `custom_components/ev_charger` directory to your Home Assistant `custom_components` directory
+1. Copy the `custom_components/ampeco_ev_charger` directory to your Home Assistant `custom_components` directory
 2. Restart Home Assistant
 3. Go to Configuration > Integrations
-4. Click the + button and search for "EV Charger"
+4. Click the + button and search for "AMPECO EV Charger"
 5. Follow the configuration steps
 
 ## Configuration
 
 You will need:
-- ChargePoint ID
+- Your ChargePoint ID
 - Authentication Token
 - API Host (optional, defaults to standard endpoint)
 

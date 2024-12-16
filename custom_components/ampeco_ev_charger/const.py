@@ -4,6 +4,7 @@ from datetime import timedelta
 
 DOMAIN = "ampeco_ev_charger"
 SCAN_INTERVAL = timedelta(seconds=30)
+IDLE_SCAN_INTERVAL = timedelta(minutes=5)
 
 # API
 DEFAULT_API_HOST = "https://app.ampeco.global"  # Updated to actual AMPECO API host
@@ -29,4 +30,5 @@ ERROR_CANNOT_CONNECT = "cannot_connect"
 # Add these constants
 DEFAULT_TIMEOUT = 10
 MAX_RETRIES = 3
-MIN_TIME_BETWEEN_RETRIES = timedelta(minutes=1)
+MIN_TIME_BETWEEN_RETRIES = timedelta(seconds=30)
+BACKOFF_MULTIPLIER = 2
