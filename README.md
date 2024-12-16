@@ -1,6 +1,6 @@
 # Home Assistant AMPECO EV Charger Integration
 
-A Home Assistant custom integration for AMPECO EV Charger control and monitoring. This integration is currently for personal use and is not production ready.
+A Home Assistant custom integration for AMPECO EV Charger control and monitoring. This integration is currently for personal use and is not production ready. Actually, I'm not even sure it will work outside of the white-labeled vendor of my particular charger (MegaTel).
 
 **Author**: Roman Avsec
 **License**: GPL-3.0
@@ -47,9 +47,11 @@ You will need:
 - Authentication Token
 - API Host (optional, defaults to standard endpoint)
 
+Unfortunately, AMPECO leaves it up to every vendor to implement their own login-flows, so sniffing out Authentication Token from your mobile app is currently both, the only possible way for a general-authentication flow, and hugely impractical.
+
 ## Development Status
 
-This integration is under active development. Features and APIs may change without notice.
+This integration is under active development. Features and APIs may change without notice. Partially based off of AMPECO API documentation, particularly the "Driver App" sections: https://developers.ampeco.com/docs/overview
 
 ## Contributing
 
@@ -61,4 +63,4 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 
 ## Disclaimer
 
-This integration is not affiliated with any EV charger manufacturer. All product names, logos, and brands are property of their respective owners. 
+This integration is not affiliated with any EV charger manufacturer or vendor. All product names, logos, and brands are property of their respective owners. 
