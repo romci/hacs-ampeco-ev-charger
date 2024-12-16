@@ -1,4 +1,5 @@
 """Config flow for EV Charger integration."""
+
 from __future__ import annotations
 
 import logging
@@ -13,7 +14,14 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api_client import EVChargerApiClient
-from .const import CONF_AUTH_TOKEN, CONF_CHARGEPOINT_ID, CONF_EVSE_ID, DOMAIN, DEFAULT_API_HOST
+from .const import (
+    DOMAIN,
+    CONF_AUTH_TOKEN,
+    CONF_CHARGEPOINT_ID,
+    CONF_EVSE_ID,
+    CONF_API_HOST,
+    DEFAULT_API_HOST,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,42 +33,64 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
     }
 )
 
+
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
     """Validate the user input allows us to connect."""
+    _LOGGER.debug(
+        "Validating input - Host: %s, Chargepoint ID: %s, Token length: %d",
+        data[CONF_API_HOST],
+        data[CONF_CHARGEPOINT_ID],
+        len(data[CONF_AUTH_TOKEN]),
+    )
+
     session = async_get_clientsession(hass)
-    
     client = EVChargerApiClient(
-        host="https://api.example.com",  # Replace with actual API host
+        host=data[CONF_API_HOST],
         chargepoint_id=data[CONF_CHARGEPOINT_ID],
         auth_token=data[CONF_AUTH_TOKEN],
         session=session,
     )
 
     try:
+        _LOGGER.debug("Attempting to get charger status")
         status = await client.get_charger_status()
+        _LOGGER.debug("Received charger status: %s", status)
+
         if not status:
+            _LOGGER.error("Empty status response")
             raise InvalidAuth
-            
+
         # Get the first EVSE ID from the charger status
         evses = status.get("evses", [])
+        _LOGGER.debug("Found EVSEs: %s", evses)
+
         if not evses:
+            _LOGGER.error("No EVSEs found in response")
             raise CannotConnect("No EVSE found for this charger")
-            
+
         evse_id = evses[0].get("id")
         if not evse_id:
+            _LOGGER.error("No EVSE ID found in first EVSE")
             raise CannotConnect("Invalid EVSE configuration")
 
+        _LOGGER.info("Successfully validated configuration with EVSE ID: %s", evse_id)
         return {
             "title": f"AMPECO EV Charger {data[CONF_CHARGEPOINT_ID]}",
             "evse_id": evse_id,
         }
-            
+
     except aiohttp.ClientResponseError as err:
+        _LOGGER.error("HTTP error during validation: %s", err)
         if err.status == 401:
             raise InvalidAuth from err
         raise CannotConnect from err
     except aiohttp.ClientError as err:
+        _LOGGER.error("Connection error during validation: %s", err)
         raise CannotConnect from err
+    except Exception as err:
+        _LOGGER.exception("Unexpected error during validation: %s", err)
+        raise
+
 
 class EVChargerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for EV Charger."""
@@ -81,7 +111,7 @@ class EVChargerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     data={
                         **user_input,
                         CONF_EVSE_ID: info["evse_id"],
-                    }
+                    },
                 )
             except CannotConnect:
                 errors["base"] = "cannot_connect"
@@ -97,9 +127,10 @@ class EVChargerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
+
 class CannotConnect(HomeAssistantError):
     """Error to indicate we cannot connect."""
 
+
 class InvalidAuth(HomeAssistantError):
     """Error to indicate there is invalid auth."""
-  

@@ -1,9 +1,9 @@
 {
-  "domain": "ev_charger",
+  "domain": "ampeco_ev_charger",
   "name": "AMPECO EV Charger",
   "config_flow": true,
-  "documentation": "https://github.com/roman-avsec/ha-ev-charger",
-  "issue_tracker": "https://github.com/roman-avsec/ha-ev-charger/issues",
+  "documentation": "https://github.com/romci/hacs-ampeco-ev-charger",
+  "issue_tracker": "https://github.com/romci/hacs-ampeco-ev-charger/issues",
   "requirements": [],
   "ssdp": [],
   "zeroconf": [],
@@ -13,4 +13,4 @@
   "iot_class": "cloud_polling",
   "version": "0.1.0",
   "license": "GPL-3.0"
-} 
+}

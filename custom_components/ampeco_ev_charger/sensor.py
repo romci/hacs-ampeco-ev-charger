@@ -1,4 +1,5 @@
 """Sensor platform for EV Charger integration."""
+
 from __future__ import annotations
 
 from homeassistant.components.sensor import (
@@ -21,6 +22,7 @@ from homeassistant.const import (
 from .const import DOMAIN, SENSOR_TYPE_CHARGER_STATUS, SENSOR_TYPE_CHARGING_SESSION
 from .coordinator import EVChargerDataUpdateCoordinator
 
+
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
@@ -36,31 +38,37 @@ async def async_setup_entry(
         ChargingEnergySensor(coordinator),
         ChargingDurationSensor(coordinator),
     ]
-    
+
     async_add_entities(sensors)
+
 
 class EVChargerBaseSensor(CoordinatorEntity, SensorEntity):
     """Base class for EV Charger sensors."""
 
-    def __init__(self, coordinator: EVChargerDataUpdateCoordinator, sensor_type: str) -> None:
+    def __init__(
+        self, coordinator: EVChargerDataUpdateCoordinator, sensor_type: str
+    ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._sensor_type = sensor_type
-        
+
         # Get charger data
         charger_data = coordinator.data["status"]
         chargepoint_id = coordinator.config_entry.data["chargepoint_id"]
         evse_id = coordinator.config_entry.data["evse_id"]
-        
+
         self._attr_unique_id = f"{chargepoint_id}_{evse_id}_{sensor_type}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, evse_id)},
             name=charger_data.get("name", f"AMPECO EV Charger {chargepoint_id}"),
             manufacturer="AMPECO",
-            model=charger_data.get("evses", [{}])[0].get("connectors", [{}])[0].get("name", "Unknown"),
+            model=charger_data.get("evses", [{}])[0]
+            .get("connectors", [{}])[0]
+            .get("name", "Unknown"),
             sw_version=charger_data.get("firmware_version"),
             configuration_url=f"https://app.ampeco.global/chargers/{chargepoint_id}",  # Updated URL
         )
+
 
 class ChargerStatusSensor(EVChargerBaseSensor):
     """Sensor for charger status."""
@@ -90,6 +98,7 @@ class ChargerStatusSensor(EVChargerBaseSensor):
             "allowed_solar_min_power_kw": status_data.get("allowed_solar_min_power_kw"),
         }
 
+
 class ChargingSessionSensor(EVChargerBaseSensor):
     """Sensor for charging session."""
 
@@ -113,7 +122,7 @@ class ChargingSessionSensor(EVChargerBaseSensor):
         session_data = self.coordinator.data["session"]
         if not session_data:
             return {}
-            
+
         return {
             "session_id": session_data.get("id"),
             "started_at": session_data.get("startedAt"),
@@ -125,7 +134,8 @@ class ChargingSessionSensor(EVChargerBaseSensor):
             "evse_status": session_data.get("evseStatus"),
             "total_duration": session_data.get("totalDuration"),
             "total_amount": session_data.get("totalAmount"),
-        } 
+        }
+
 
 class ChargingCurrentSensor(EVChargerBaseSensor):
     """Sensor for charging current."""
@@ -142,6 +152,7 @@ class ChargingCurrentSensor(EVChargerBaseSensor):
     def native_value(self):
         """Return the state of the sensor."""
         return self.coordinator.data["status"].get("max_current_a")
+
 
 class ChargingEnergySensor(EVChargerBaseSensor):
     """Sensor for charging energy."""
@@ -160,6 +171,7 @@ class ChargingEnergySensor(EVChargerBaseSensor):
         session_data = self.coordinator.data["session"]
         return float(session_data.get("energy", 0)) if session_data else 0
 
+
 class ChargingDurationSensor(EVChargerBaseSensor):
     """Sensor for charging duration."""
 
@@ -174,4 +186,4 @@ class ChargingDurationSensor(EVChargerBaseSensor):
     def native_value(self):
         """Return the state of the sensor."""
         session_data = self.coordinator.data["session"]
-        return session_data.get("duration", 0) if session_data else 0 
+        return session_data.get("duration", 0) if session_data else 0

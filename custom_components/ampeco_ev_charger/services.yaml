@@ -3,7 +3,7 @@ start_charging:
   description: Start a charging session
   target:
     entity:
-      integration: ev_charger
+      integration: ampeco_ev_charger
       domain: sensor
   fields:
     max_current:
@@ -21,5 +21,5 @@ stop_charging:
   description: Stop the current charging session
   target:
     entity:
-      integration: ev_charger
-      domain: sensor 
+      integration: ampeco_ev_charger
+      domain: sensor

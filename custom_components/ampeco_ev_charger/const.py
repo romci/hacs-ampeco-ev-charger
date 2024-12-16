@@ -1,7 +1,8 @@
-"""Constants for the EV Charger integration."""
+"""Constants for the AMPECO EV Charger integration."""
+
 from datetime import timedelta
 
-DOMAIN = "ev_charger"
+DOMAIN = "ampeco_ev_charger"
 SCAN_INTERVAL = timedelta(seconds=30)
 
 # API
@@ -28,4 +29,4 @@ ERROR_CANNOT_CONNECT = "cannot_connect"
 # Add these constants
 DEFAULT_TIMEOUT = 10
 MAX_RETRIES = 3
-MIN_TIME_BETWEEN_RETRIES = timedelta(minutes=1) 
+MIN_TIME_BETWEEN_RETRIES = timedelta(minutes=1)
