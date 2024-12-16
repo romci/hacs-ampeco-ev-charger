@@ -57,30 +57,33 @@ class EVChargerDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.debug("Fetching charger status")
             charger_status = await self.api_client.get_charger_status()
 
-            try:
-                _LOGGER.debug("Fetching active session")
-                active_session = await self.api_client.get_active_session()
+            # Extract EVSE status
+            evse_status = (
+                charger_status.get("data", {})
+                .get("evses", [{}])[0]
+                .get("status", "unknown")
+            )
 
-                # Check if we actually have session data
-                has_active_session = bool(
-                    active_session and active_session.get("session")
-                )
-                _LOGGER.debug(
-                    "Active session check: %s, updating polling strategy",
-                    "found" if has_active_session else "not found",
-                )
-                self.polling_strategy.update_charging_state(has_active_session)
+            active_session = {}
+            if evse_status == "charging":
+                _LOGGER.debug("Charger is charging, fetching active session")
+                try:
+                    active_session = await self.api_client.get_active_session()
+                except NoActiveSessionError:
+                    _LOGGER.debug("No active session found despite charging status")
+                    active_session = {}
+            else:
+                _LOGGER.debug("Charger not charging, skipping session fetch")
 
-            except NoActiveSessionError:
-                _LOGGER.debug("No active session found")
-                active_session = {}
-                self.polling_strategy.update_charging_state(False)
+            # Update polling strategy based on charging status
+            is_charging = evse_status == "charging"
+            self.polling_strategy.update_charging_state(is_charging)
 
             # Update the coordinator's update interval
             old_interval = self.update_interval
             self.update_interval = self.polling_strategy.update_interval
             _LOGGER.debug(
-                "Updated coordinator interval from to: %s -> %s",
+                "Updated coordinator interval: %s -> %s",
                 old_interval,
                 self.update_interval,
             )

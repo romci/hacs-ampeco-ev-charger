@@ -84,6 +84,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         await coordinator.stop_charging()
 
+    async def handle_update_data(call: ServiceCall) -> None:
+        """Handle the service call."""
+        _LOGGER.debug("Manual update triggered")
+        await coordinator.async_refresh()
+
     hass.services.async_register(
         DOMAIN,
         SERVICE_START_CHARGING,
@@ -96,6 +101,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         SERVICE_STOP_CHARGING,
         handle_stop_charging,
     )
+
+    hass.services.async_register(DOMAIN, "update_data", handle_update_data)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -110,7 +117,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         # Remove services if this is the last config entry
         if not hass.data[DOMAIN]:
-            for service in [SERVICE_START_CHARGING, SERVICE_STOP_CHARGING]:
+            for service in [
+                SERVICE_START_CHARGING,
+                SERVICE_STOP_CHARGING,
+                "update_data",
+            ]:
                 if hass.services.has_service(DOMAIN, service):
                     hass.services.async_remove(DOMAIN, service)
 

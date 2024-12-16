@@ -23,3 +23,10 @@ stop_charging:
     entity:
       integration: ampeco_ev_charger
       domain: sensor
+
+update_data:
+  name: Update Data
+  description: Manually trigger a data update from the AMPECO EV Charger.
+  target:
+    entity:
+      integration: ampeco_ev_charger

@@ -40,6 +40,9 @@ async def async_setup_entry(
         ChargingEnergySensor(coordinator),
         ChargingDurationSensor(coordinator),
         PollingIntervalSensor(coordinator),
+        EVSEStatusSensor(coordinator),
+        MaxCurrentSensor(coordinator),
+        LastMonthStatsSensor(coordinator),
     ]
 
     async_add_entities(sensors)
@@ -216,4 +219,75 @@ class PollingIntervalSensor(EVChargerBaseSensor):
             "is_charging": self.coordinator.polling_strategy._is_charging,
             "retry_count": self.coordinator.polling_strategy._retry_count,
             "last_retry": self.coordinator.polling_strategy._last_retry,
+        }
+
+
+class EVSEStatusSensor(EVChargerBaseSensor):
+    """Sensor for EVSE status."""
+
+    def __init__(self, coordinator: EVChargerDataUpdateCoordinator) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, "evse_status")
+        self._attr_name = "EVSE Status"
+        self._attr_icon = "mdi:ev-station"
+        self._attr_entity_category = None  # This is important enough to show in main UI
+
+    @property
+    def native_value(self) -> str:
+        """Return the state of the sensor."""
+        if not self.coordinator.data["status"].get("evses"):
+            return "unavailable"
+        return self.coordinator.data["status"]["evses"][0]["status"]
+
+
+class MaxCurrentSensor(EVChargerBaseSensor):
+    """Sensor for maximum allowed current."""
+
+    def __init__(self, coordinator: EVChargerDataUpdateCoordinator) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, "max_current")
+        self._attr_name = "Maximum Current"
+        self._attr_device_class = SensorDeviceClass.CURRENT
+        self._attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    @property
+    def native_value(self) -> float:
+        """Return the state of the sensor."""
+        return float(self.coordinator.data["status"].get("max_current_a", 0))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional attributes."""
+        status = self.coordinator.data["status"]
+        return {
+            "allowed_min_current": status.get("allowed_min_current_a"),
+            "allowed_max_current": status.get("allowed_max_current_a"),
+        }
+
+
+class LastMonthStatsSensor(EVChargerBaseSensor):
+    """Sensor for last month's statistics."""
+
+    def __init__(self, coordinator: EVChargerDataUpdateCoordinator) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, "last_month_energy")
+        self._attr_name = "Last Month Energy"
+        self._attr_device_class = SensorDeviceClass.ENERGY
+        self._attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    @property
+    def native_value(self) -> float:
+        """Return the state of the sensor."""
+        return float(self.coordinator.data["status"].get("last_month_energy_kwh", 0))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional attributes."""
+        status = self.coordinator.data["status"]
+        return {
+            "electricity_cost": status.get("last_month_electricity_cost", 0),
+            "tax_name": status.get("electricity_cost_tax_name"),
+            "tax_percent": status.get("electricity_cost_tax_percent"),
         }
