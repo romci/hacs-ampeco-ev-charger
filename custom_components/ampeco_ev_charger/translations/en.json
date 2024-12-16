@@ -3,17 +3,24 @@
         "step": {
             "user": {
                 "title": "Connect to your AMPECO EV Charger",
-                "description": "Please enter your AMPECO ChargePoint ID and authentication token.",
+                "description": "Please enter your AMPECO API host and authentication token.",
                 "data": {
                     "api_host": "API Host",
-                    "chargepoint_id": "ChargePoint ID",
                     "auth_token": "Authentication Token"
+                }
+            },
+            "select_chargepoint": {
+                "title": "Select Chargepoint",
+                "description": "Please select your chargepoint from the list.",
+                "data": {
+                    "chargepoint_id": "Chargepoint"
                 }
             }
         },
         "error": {
             "cannot_connect": "Failed to connect",
             "invalid_auth": "Invalid authentication",
+            "no_chargepoints": "No chargepoints found",
             "unknown": "Unexpected error"
         },
         "abort": {
