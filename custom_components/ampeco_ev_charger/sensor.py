@@ -18,6 +18,8 @@ from homeassistant.const import (
     UnitOfPower,
     UnitOfTime,
 )
+from homeassistant.helpers.entity import EntityCategory
+from typing import Any
 
 from .const import DOMAIN, SENSOR_TYPE_CHARGER_STATUS, SENSOR_TYPE_CHARGING_SESSION
 from .coordinator import EVChargerDataUpdateCoordinator
@@ -37,6 +39,7 @@ async def async_setup_entry(
         ChargingCurrentSensor(coordinator),
         ChargingEnergySensor(coordinator),
         ChargingDurationSensor(coordinator),
+        PollingIntervalSensor(coordinator),
     ]
 
     async_add_entities(sensors)
@@ -187,3 +190,30 @@ class ChargingDurationSensor(EVChargerBaseSensor):
         """Return the state of the sensor."""
         session_data = self.coordinator.data["session"]
         return session_data.get("duration", 0) if session_data else 0
+
+
+class PollingIntervalSensor(EVChargerBaseSensor):
+    """Sensor for polling interval."""
+
+    def __init__(self, coordinator: EVChargerDataUpdateCoordinator) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, "polling_interval")
+        self._attr_name = "Polling Interval"
+        self._attr_device_class = SensorDeviceClass.DURATION
+        self._attr_native_unit_of_measurement = UnitOfTime.SECONDS
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        self._attr_entity_registry_enabled_default = True
+
+    @property
+    def native_value(self) -> int:
+        """Return the state of the sensor."""
+        return self.coordinator.update_interval.total_seconds()
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the state attributes."""
+        return {
+            "is_charging": self.coordinator.polling_strategy._is_charging,
+            "retry_count": self.coordinator.polling_strategy._retry_count,
+            "last_retry": self.coordinator.polling_strategy._last_retry,
+        }

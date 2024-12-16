@@ -53,15 +53,18 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
 
     try:
         _LOGGER.debug("Attempting to get charger status")
-        status = await client.get_charger_status()
-        _LOGGER.debug("Received charger status: %s", status)
+        response = await client.get_charger_status()
+        _LOGGER.debug("Received charger status: %s", response)
 
-        if not status:
-            _LOGGER.error("Empty status response")
+        if not response or "data" not in response:
+            _LOGGER.error("Empty or invalid response")
             raise InvalidAuth
 
+        # Get the actual charger data from the nested 'data' key
+        charger_data = response["data"]
+
         # Get the first EVSE ID from the charger status
-        evses = status.get("evses", [])
+        evses = charger_data.get("evses", [])
         _LOGGER.debug("Found EVSEs: %s", evses)
 
         if not evses:

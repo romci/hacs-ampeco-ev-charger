@@ -16,24 +16,36 @@ This integration is currently in development and intended for personal use. It i
 - Power and energy consumption tracking
 - Smart charging capabilities
 - Detailed charging session information
+- Adaptive polling intervals (30s during charging, 5min idle)
 
 ## Sensors
 
 The integration provides several sensors:
-- Charger Status
-- Charging Session
-- Charging Current
-- Charging Energy
-- Charging Duration
+- **Charger Status**: Current status of the charger
+- **Charging Session**: Active charging session information
+- **Charging Current**: Current charging rate in amperes
+- **Charging Energy**: Total energy delivered in kWh
+- **Charging Duration**: Duration of the active charging session
+- **Polling Interval** (diagnostic): Current update interval with charging state info
 
 ## Services
 
 Two main services are provided:
 - `ampeco_ev_charger.start_charging`: Start a charging session
+  - Optional parameter: `max_current` (6-32A)
 - `ampeco_ev_charger.stop_charging`: Stop the current charging session
 
-## Manual Installation
+## Installation
 
+### HACS Installation (Recommended)
+1. Add this repository to HACS as a custom repository
+   - Repository: `roman-avsec/hacs-ampeco-ev-charger`
+   - Category: `Integration`
+2. Install the integration through HACS
+3. Restart Home Assistant
+4. Add the integration through the HA interface
+
+### Manual Installation
 1. Copy the `custom_components/ampeco_ev_charger` directory to your Home Assistant `custom_components` directory
 2. Restart Home Assistant
 3. Go to Configuration > Integrations
@@ -49,6 +61,27 @@ You will need:
 
 Unfortunately, AMPECO leaves it up to every vendor to implement their own login-flows, so sniffing out Authentication Token from your mobile app is currently both, the only possible way for a general-authentication flow, and hugely impractical.
 
+### Finding Your Authentication Token
+1. Use your browser's developer tools or a mobile proxy like Charles
+2. Monitor network traffic while using your charger's mobile app
+3. Look for API requests to the AMPECO backend
+4. Extract the Bearer token from the Authorization header
+
+## Advanced Features
+
+### Adaptive Polling
+The integration implements an adaptive polling strategy:
+- 30-second intervals during active charging
+- 5-minute intervals when idle
+- Automatic adjustment based on charging state
+- Exponential backoff on errors
+
+### Diagnostic Information
+The integration provides diagnostic information through:
+- Polling interval sensor with charging state
+- Detailed error logging
+- Retry count and timing information
+
 ## Development Status
 
 This integration is under active development. Features and APIs may change without notice. Partially based off of AMPECO API documentation, particularly the "Driver App" sections: https://developers.ampeco.com/docs/overview
@@ -63,4 +96,4 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 
 ## Disclaimer
 
-This integration is not affiliated with any EV charger manufacturer or vendor. All product names, logos, and brands are property of their respective owners. 
+This integration is not affiliated with, endorsed by, or connected to AMPECO or any EV charger manufacturer or vendor. All product names, logos, and brands are property of their respective owners.

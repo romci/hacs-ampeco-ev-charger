@@ -1,4 +1,5 @@
 """DataUpdateCoordinator for EV Charger."""
+
 from datetime import timedelta
 import logging
 from typing import Any
@@ -18,6 +19,7 @@ from .exceptions import AuthenticationError, NoActiveSessionError
 
 _LOGGER = logging.getLogger(__name__)
 
+
 class EVChargerDataUpdateCoordinator(DataUpdateCoordinator):
     """Class to manage fetching data from the API."""
 
@@ -29,14 +31,14 @@ class EVChargerDataUpdateCoordinator(DataUpdateCoordinator):
     ) -> None:
         """Initialize coordinator."""
         self.polling_strategy = AdaptivePollingStrategy(hass)
-        
+
         super().__init__(
             hass,
             _LOGGER,
             name=DOMAIN,
             update_interval=self.polling_strategy.update_interval,
         )
-        
+
         self.config_entry = config_entry
         self.api_client = self._create_client(hass, config_entry)
 
@@ -54,12 +56,21 @@ class EVChargerDataUpdateCoordinator(DataUpdateCoordinator):
         try:
             _LOGGER.debug("Fetching charger status")
             charger_status = await self.api_client.get_charger_status()
-            
+
             try:
                 _LOGGER.debug("Fetching active session")
                 active_session = await self.api_client.get_active_session()
-                _LOGGER.debug("Active session found, updating polling strategy")
-                self.polling_strategy.update_charging_state(True)
+
+                # Check if we actually have session data
+                has_active_session = bool(
+                    active_session and active_session.get("session")
+                )
+                _LOGGER.debug(
+                    "Active session check: %s, updating polling strategy",
+                    "found" if has_active_session else "not found",
+                )
+                self.polling_strategy.update_charging_state(has_active_session)
+
             except NoActiveSessionError:
                 _LOGGER.debug("No active session found")
                 active_session = {}
@@ -69,14 +80,14 @@ class EVChargerDataUpdateCoordinator(DataUpdateCoordinator):
             old_interval = self.update_interval
             self.update_interval = self.polling_strategy.update_interval
             _LOGGER.debug(
-                "Updated coordinator interval: %s -> %s",
+                "Updated coordinator interval from to: %s -> %s",
                 old_interval,
-                self.update_interval
+                self.update_interval,
             )
 
             return {
-                "status": charger_status,
-                "session": active_session
+                "status": charger_status.get("data", {}),
+                "session": active_session.get("session", {}),
             }
 
         except AuthenticationError as err:
@@ -99,4 +110,4 @@ class EVChargerDataUpdateCoordinator(DataUpdateCoordinator):
         result = await self.api_client.stop_charging()
         self.polling_strategy.update_charging_state(False)
         await self.async_refresh()
-        return result 
+        return result

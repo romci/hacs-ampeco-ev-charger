@@ -7,7 +7,7 @@ SCAN_INTERVAL = timedelta(seconds=30)
 IDLE_SCAN_INTERVAL = timedelta(minutes=5)
 
 # API
-DEFAULT_API_HOST = "https://app.ampeco.global"  # Updated to actual AMPECO API host
+DEFAULT_API_HOST = "https://vendor.eu.charge.ampeco.tech"
 CONF_API_HOST = "api_host"
 
 # Config flow constants

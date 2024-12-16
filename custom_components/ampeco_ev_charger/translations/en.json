@@ -5,6 +5,7 @@
                 "title": "Connect to your AMPECO EV Charger",
                 "description": "Please enter your AMPECO ChargePoint ID and authentication token.",
                 "data": {
+                    "api_host": "API Host",
                     "chargepoint_id": "ChargePoint ID",
                     "auth_token": "Authentication Token"
                 }
@@ -19,4 +20,4 @@
             "already_configured": "Device is already configured"
         }
     }
-} 
+}
