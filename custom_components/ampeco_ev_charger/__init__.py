@@ -87,7 +87,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     async def handle_update_data(call: ServiceCall) -> None:
         """Handle the service call."""
         _LOGGER.debug("Manual update triggered")
-        await coordinator.async_refresh()
+        await coordinator.manual_update_evse_status()
 
     hass.services.async_register(
         DOMAIN,
