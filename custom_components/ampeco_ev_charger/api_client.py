@@ -87,11 +87,40 @@ class EVChargerApiClient(BaseApiClient):
     async def stop_charging(self) -> dict[str, Any]:
         """Stop charging session."""
         if not self._active_session_id:
-            raise HomeAssistantError("No active charging session to stop")
+            # Try to get session ID from charge_point info if not available
+            _LOGGER.debug(
+                "No active session ID found, attempting to get from charge_point info"
+            )
+            try:
+                charger_status = await self.get_charger_status()
+                evse = charger_status.get("data", {}).get("evses", [{}])[0]
 
-        response = await self._make_request(
-            "POST", f"app/session/{self._active_session_id}/end", headers=self._headers
-        )
-        session_data = response.get("session", {})
-        self._active_session_id = None
-        return session_data
+                # Check if there's a session in the EVSE (even if it's in "preparing" state)
+                if evse.get("session", {}).get("id"):
+                    _LOGGER.debug(
+                        "Found session ID from charge_point info: %s",
+                        evse["session"]["id"],
+                    )
+                    self._active_session_id = evse["session"]["id"]
+                else:
+                    raise HomeAssistantError("No active charging session to stop")
+            except Exception as err:
+                _LOGGER.error(
+                    "Failed to get session from charge_point info: %s", str(err)
+                )
+                raise HomeAssistantError("No active charging session to stop") from err
+
+        try:
+            response = await self._make_request(
+                "POST",
+                f"app/session/{self._active_session_id}/end",
+                headers=self._headers,
+            )
+            session_data = response.get("session", {})
+            self._active_session_id = None
+            return session_data
+        except Exception as err:
+            _LOGGER.error("Failed to stop charging session: %s", str(err))
+            # Always clear the session ID to avoid getting stuck
+            self._active_session_id = None
+            raise
