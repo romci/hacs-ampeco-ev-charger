@@ -28,6 +28,16 @@ The integration provides several sensors:
 - **Charging Duration**: Duration of the active charging session
 - **Polling Interval** (diagnostic): Current update interval with charging state info
 
+## Unit Conversions
+
+The integration handles several unit conversions to ensure values are displayed correctly:
+
+- **Power**: Values are converted from watts (W) to kilowatts (kW) when needed
+- **Energy**: Values are converted from watt-hours (Wh) to kilowatt-hours (kWh) when needed
+- **Duration**: Values are converted from seconds to minutes for easier reading
+
+These conversions ensure that the values displayed in Home Assistant match what you see in the official AMPECO app.
+
 ## Services
 
 Two main services are provided:

@@ -59,7 +59,11 @@ class EVChargerApiClient(BaseApiClient):
 
             if session_data and "id" in session_data:
                 _LOGGER.debug(
-                    "Found session in charge point info: %s", session_data["id"]
+                    "Found session in charge point info: %s, power: %s, energy: %s, duration: %s seconds",
+                    session_data["id"],
+                    session_data.get("power"),
+                    session_data.get("energy"),
+                    session_data.get("duration"),
                 )
                 self._active_session_id = session_data["id"]
                 return {"session": session_data}

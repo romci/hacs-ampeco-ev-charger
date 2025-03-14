@@ -43,6 +43,7 @@ async def async_setup_entry(
         EVSEStatusSensor(coordinator),
         MaxCurrentSensor(coordinator),
         LastMonthStatsSensor(coordinator),
+        SessionIDSensor(coordinator),
     ]
 
     async_add_entities(sensors)
@@ -114,13 +115,21 @@ class ChargingSessionSensor(EVChargerBaseSensor):
         self._attr_name = "Charging Session"
         self._attr_device_class = SensorDeviceClass.POWER
         self._attr_state_class = SensorStateClass.MEASUREMENT
-        self._attr_native_unit_of_measurement = "kW"
+        self._attr_native_unit_of_measurement = UnitOfPower.KILO_WATT
 
     @property
     def native_value(self):
         """Return the state of the sensor."""
         session_data = self.coordinator.data["session"]
-        return session_data.get("power", 0) if session_data else 0
+        if not session_data:
+            return 0
+
+        # Get power and convert from W to kW if needed
+        power = session_data.get("power", 0)
+        # If power is very large, it's likely in W instead of kW
+        if power > 1000:  # If power is more than 1000, assume it's in watts
+            power = power / 1000
+        return round(power, 2)  # Round to 2 decimal places
 
     @property
     def extra_state_attributes(self):
@@ -175,7 +184,21 @@ class ChargingEnergySensor(EVChargerBaseSensor):
     def native_value(self):
         """Return the state of the sensor."""
         session_data = self.coordinator.data["session"]
-        return float(session_data.get("energy", 0)) if session_data else 0
+        if not session_data:
+            return 0
+
+        # Get energy value
+        energy = session_data.get("energy", 0)
+        try:
+            energy = float(energy)
+        except (ValueError, TypeError):
+            return 0
+
+        # If energy is very large (more than 100), it's likely in Wh instead of kWh
+        if energy > 100:
+            energy = energy / 1000
+
+        return round(energy, 2)  # Round to 2 decimal places
 
 
 class ChargingDurationSensor(EVChargerBaseSensor):
@@ -192,7 +215,21 @@ class ChargingDurationSensor(EVChargerBaseSensor):
     def native_value(self):
         """Return the state of the sensor."""
         session_data = self.coordinator.data["session"]
-        return session_data.get("duration", 0) if session_data else 0
+        if not session_data:
+            return 0
+
+        # Get duration value
+        duration = session_data.get("duration", 0)
+        try:
+            duration = int(duration)
+        except (ValueError, TypeError):
+            return 0
+
+        # The API returns duration in seconds, convert to minutes
+        if duration > 0:
+            duration = round(duration / 60)  # Convert seconds to minutes and round
+
+        return duration
 
 
 class PollingIntervalSensor(EVChargerBaseSensor):
@@ -290,4 +327,36 @@ class LastMonthStatsSensor(EVChargerBaseSensor):
             "electricity_cost": status.get("last_month_electricity_cost", 0),
             "tax_name": status.get("electricity_cost_tax_name"),
             "tax_percent": status.get("electricity_cost_tax_percent"),
+        }
+
+
+class SessionIDSensor(EVChargerBaseSensor):
+    """Sensor for active session ID."""
+
+    def __init__(self, coordinator: EVChargerDataUpdateCoordinator) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, "session_id")
+        self._attr_name = "Session ID"
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        self._attr_entity_registry_enabled_default = False  # Hidden by default
+        self._attr_icon = "mdi:identifier"
+
+    @property
+    def native_value(self):
+        """Return the state of the sensor."""
+        session_data = self.coordinator.data["session"]
+        return session_data.get("id") if session_data else None
+
+    @property
+    def extra_state_attributes(self):
+        """Return the state attributes."""
+        session_data = self.coordinator.data["session"]
+        if not session_data:
+            return {}
+
+        return {
+            "started_at": session_data.get("startedAt"),
+            "status": session_data.get("status"),
+            "evse_status": session_data.get("evseStatus"),
+            "charging_state": session_data.get("chargingState"),
         }
