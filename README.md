@@ -20,13 +20,21 @@ This integration is currently in development and intended for personal use. It i
 
 ## Sensors
 
-The integration provides several sensors:
-- **Charger Status**: Current status of the charger
-- **Charging Session**: Active charging session information
-- **Charging Current**: Current charging rate in amperes
-- **Charging Energy**: Total energy delivered in kWh
-- **Charging Duration**: Duration of the active charging session
-- **Polling Interval** (diagnostic): Current update interval with charging state info
+The integration provides several sensors for each charger. Each sensor has a unique entity ID prefixed with `sensor.evse_` followed by the chargepoint ID in lowercase slug format (e.g., `sensor.evse_abcxyz_charging_current`). This ensures that when multiple chargers are added, their entity IDs won't conflict.
+
+Available sensors include:
+- **Status**: Current status of the charger (`sensor.evse_abcxyz_charger_status`)
+- **Charging Session**: Active charging session information with power in kW (`sensor.evse_abcxyz_charging_session`)
+- **Charging Current**: Current charging rate in amperes (`sensor.evse_abcxyz_charging_current`)
+- **Charging Energy**: Total energy delivered in kWh (`sensor.evse_abcxyz_charging_energy`)
+- **Charging Duration**: Duration of the active charging session in minutes (`sensor.evse_abcxyz_charging_duration`)
+- **EVSE Status**: Status of the specific EVSE (connector) (`sensor.evse_abcxyz_evse_status`)
+- **Polling Interval** (diagnostic): Current update interval with charging state info (`sensor.evse_abcxyz_polling_interval`)
+- **Maximum Current** (diagnostic): Maximum allowed charging current (`sensor.evse_abcxyz_max_current`)
+- **Last Month Energy** (diagnostic): Energy used in the previous month (`sensor.evse_abcxyz_last_month_energy`)
+- **Session ID** (diagnostic): Active charging session identifier (`sensor.evse_abcxyz_session_id`)
+
+Each sensor will display with a friendly name combining the charger name and sensor type (e.g., "My House Charging Current").
 
 ## Unit Conversions
 
@@ -40,10 +48,30 @@ These conversions ensure that the values displayed in Home Assistant match what 
 
 ## Services
 
-Two main services are provided:
-- `ampeco_ev_charger.start_charging`: Start a charging session
-  - Optional parameter: `max_current` (6-32A)
-- `ampeco_ev_charger.stop_charging`: Stop the current charging session
+The integration provides services to control your chargers:
+
+- `ampeco_ev_charger.start_charging`: Start a charging session for a specific device
+  - Required parameter: `device_id` - The ID of the EV charger device to start
+  - Optional parameter: `max_current` - Maximum charging current in amperes (6-32A)
+
+- `ampeco_ev_charger.stop_charging`: Stop the current charging session for a specific device
+  - Required parameter: `device_id` - The ID of the EV charger device to stop
+
+- `ampeco_ev_charger.update_data`: Manually trigger a data update for a specific device
+  - Required parameter: `device_id` - The ID of the EV charger device to update
+
+When multiple chargers are configured, you must specify the `device_id` to target the correct charger. The device ID is different from the entity ID and remains consistent even after our recent entity ID changes.
+
+### Finding the Device ID for Service Calls
+
+To find the correct device ID for service calls:
+
+1. Go to **Settings** > **Devices & Services** in your Home Assistant dashboard
+2. Find your AMPECO EV Charger in the list and click on it
+3. In the URL bar, you'll see a path like `/config/devices/device/abc123...` - the last part after `/device/` is your device ID
+4. Alternatively, use the Developer Tools > Services panel, where you can select your device from a dropdown when calling the service
+
+Note that device IDs are long strings (like `c9d46d418ffe1819e551c5d8c8e7f05e`) and are different from the entity IDs (like `sensor.evse_qng0c18010_charging_current`). Always use the device ID for service calls.
 
 ## Installation
 

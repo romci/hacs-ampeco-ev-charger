@@ -67,23 +67,82 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             _LOGGER.error("Device %s not found", device_id)
             raise ValueError(f"Device {device_id} not found")
 
+        # Add detailed debug logging
+        _LOGGER.debug("Found device for start_charging: %s", device)
+        _LOGGER.debug(
+            "Device config entries for start_charging: %s", device.config_entries
+        )
+        _LOGGER.debug("Device identifiers for start_charging: %s", device.identifiers)
+        _LOGGER.debug("DOMAIN: %s", DOMAIN)
+
+        # Verify the device belongs to our integration by checking identifiers
+        # A device belongs to our integration if it has an identifier with our domain
+        device_belongs_to_integration = False
+        for domain, identifier in device.identifiers:
+            _LOGGER.debug("Checking identifier domain for start_charging: %s", domain)
+            if domain == DOMAIN:
+                device_belongs_to_integration = True
+                _LOGGER.debug(
+                    "Device belongs to our integration via identifier: %s", identifier
+                )
+                break
+
+        if not device_belongs_to_integration:
+            _LOGGER.error("Device %s is not an AMPECO EV Charger", device_id)
+            _LOGGER.error(
+                "Device identifiers: %s, DOMAIN: %s", device.identifiers, DOMAIN
+            )
+            raise ValueError(f"Device {device_id} is not an AMPECO EV Charger")
+
         # Get the coordinator for this device
-        entry_id = next(iter(device.config_entries))
-        coordinator = hass.data[DOMAIN][entry_id]
+        try:
+            # Find a config entry for this device that belongs to our integration
+            # and has a coordinator in the hass.data dictionary
+            coordinator = None
+            for entry_id in device.config_entries:
+                # Check if this entry exists in our data dictionary
+                if entry_id in hass.data.get(DOMAIN, {}):
+                    coordinator = hass.data[DOMAIN][entry_id]
+                    _LOGGER.debug("Found coordinator using entry_id: %s", entry_id)
+                    break
+
+            if not coordinator:
+                _LOGGER.error(
+                    "Failed to find coordinator for device %s. No matching entry in hass.data[DOMAIN]",
+                    device_id,
+                )
+                raise ValueError(
+                    f"Failed to get controller for device {device_id}: No matching entry found"
+                )
+        except Exception as err:
+            _LOGGER.error(
+                "Failed to find coordinator for device %s: %s", device_id, err
+            )
+            raise ValueError(
+                f"Failed to get controller for device {device_id}"
+            ) from err
 
         # Get the EVSE ID from the device identifiers
-        evse_id = next(
-            (ident[1] for ident in device.identifiers if ident[0] == DOMAIN), None
-        )
-        if not evse_id:
-            _LOGGER.error("No EVSE ID found for device %s", device_id)
-            raise ValueError(f"No EVSE ID found for device {device_id}")
+        try:
+            evse_id = next(
+                (ident[1] for ident in device.identifiers if ident[0] == DOMAIN), None
+            )
+            if not evse_id:
+                _LOGGER.error("No EVSE ID found for device %s", device_id)
+                raise ValueError(f"No EVSE ID found for device {device_id}")
+        except Exception as err:
+            _LOGGER.error("Error getting EVSE ID: %s", err)
+            raise ValueError("Failed to get EVSE ID") from err
 
         # Get max_current from call data if provided
         max_current = call.data.get("max_current")
         _LOGGER.debug("Starting charging with max_current: %s", max_current)
 
-        await coordinator.start_charging(evse_id, max_current)
+        try:
+            await coordinator.start_charging(evse_id, max_current)
+        except Exception as err:
+            _LOGGER.error("Failed to start charging: %s", err)
+            raise
 
     async def handle_stop_charging(call: ServiceCall) -> None:
         """Handle the stop charging service call."""
@@ -102,11 +161,69 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             _LOGGER.error("Device %s not found", device_id)
             raise ValueError(f"Device {device_id} not found")
 
-        # Get the coordinator for this device
-        entry_id = next(iter(device.config_entries))
-        coordinator = hass.data[DOMAIN][entry_id]
+        # Add detailed debug logging
+        _LOGGER.debug("Found device: %s", device)
+        _LOGGER.debug("Device config entries: %s", device.config_entries)
+        _LOGGER.debug("Device identifiers: %s", device.identifiers)
+        _LOGGER.debug("DOMAIN: %s", DOMAIN)
 
-        await coordinator.stop_charging()
+        # Check each config entry and log details
+        for entry_id in device.config_entries:
+            _LOGGER.debug("Checking entry: %s", entry_id)
+            _LOGGER.debug("Entry domain part: %s", entry_id.split(".")[0])
+
+        # Verify the device belongs to our integration by checking identifiers
+        # A device belongs to our integration if it has an identifier with our domain
+        device_belongs_to_integration = False
+        for domain, identifier in device.identifiers:
+            _LOGGER.debug("Checking identifier domain: %s", domain)
+            if domain == DOMAIN:
+                device_belongs_to_integration = True
+                _LOGGER.debug(
+                    "Device belongs to our integration via identifier: %s", identifier
+                )
+                break
+
+        if not device_belongs_to_integration:
+            _LOGGER.error("Device %s is not an AMPECO EV Charger", device_id)
+            _LOGGER.error(
+                "Device identifiers: %s, DOMAIN: %s", device.identifiers, DOMAIN
+            )
+            raise ValueError(f"Device {device_id} is not an AMPECO EV Charger")
+
+        # Get the coordinator for this device
+        try:
+            # Find a config entry for this device that belongs to our integration
+            # and has a coordinator in the hass.data dictionary
+            coordinator = None
+            for entry_id in device.config_entries:
+                # Check if this entry exists in our data dictionary
+                if entry_id in hass.data.get(DOMAIN, {}):
+                    coordinator = hass.data[DOMAIN][entry_id]
+                    _LOGGER.debug("Found coordinator using entry_id: %s", entry_id)
+                    break
+
+            if not coordinator:
+                _LOGGER.error(
+                    "Failed to find coordinator for device %s. No matching entry in hass.data[DOMAIN]",
+                    device_id,
+                )
+                raise ValueError(
+                    f"Failed to get controller for device {device_id}: No matching entry found"
+                )
+        except Exception as err:
+            _LOGGER.error(
+                "Failed to find coordinator for device %s: %s", device_id, err
+            )
+            raise ValueError(
+                f"Failed to get controller for device {device_id}"
+            ) from err
+
+        try:
+            await coordinator.stop_charging()
+        except Exception as err:
+            _LOGGER.error("Failed to stop charging: %s", err)
+            raise
 
     async def handle_update_data(call: ServiceCall) -> None:
         """Handle the update data service call."""
@@ -125,12 +242,67 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             _LOGGER.error("Device %s not found", device_id)
             raise ValueError(f"Device {device_id} not found")
 
+        # Add detailed debug logging
+        _LOGGER.debug("Found device for update_data: %s", device)
+        _LOGGER.debug(
+            "Device config entries for update_data: %s", device.config_entries
+        )
+        _LOGGER.debug("Device identifiers for update_data: %s", device.identifiers)
+        _LOGGER.debug("DOMAIN: %s", DOMAIN)
+
+        # Verify the device belongs to our integration by checking identifiers
+        # A device belongs to our integration if it has an identifier with our domain
+        device_belongs_to_integration = False
+        for domain, identifier in device.identifiers:
+            _LOGGER.debug("Checking identifier domain for update_data: %s", domain)
+            if domain == DOMAIN:
+                device_belongs_to_integration = True
+                _LOGGER.debug(
+                    "Device belongs to our integration via identifier: %s", identifier
+                )
+                break
+
+        if not device_belongs_to_integration:
+            _LOGGER.error("Device %s is not an AMPECO EV Charger", device_id)
+            _LOGGER.error(
+                "Device identifiers: %s, DOMAIN: %s", device.identifiers, DOMAIN
+            )
+            raise ValueError(f"Device {device_id} is not an AMPECO EV Charger")
+
         # Get the coordinator for this device
-        entry_id = next(iter(device.config_entries))
-        coordinator = hass.data[DOMAIN][entry_id]
+        try:
+            # Find a config entry for this device that belongs to our integration
+            # and has a coordinator in the hass.data dictionary
+            coordinator = None
+            for entry_id in device.config_entries:
+                # Check if this entry exists in our data dictionary
+                if entry_id in hass.data.get(DOMAIN, {}):
+                    coordinator = hass.data[DOMAIN][entry_id]
+                    _LOGGER.debug("Found coordinator using entry_id: %s", entry_id)
+                    break
+
+            if not coordinator:
+                _LOGGER.error(
+                    "Failed to find coordinator for device %s. No matching entry in hass.data[DOMAIN]",
+                    device_id,
+                )
+                raise ValueError(
+                    f"Failed to get controller for device {device_id}: No matching entry found"
+                )
+        except Exception as err:
+            _LOGGER.error(
+                "Failed to find coordinator for device %s: %s", device_id, err
+            )
+            raise ValueError(
+                f"Failed to get controller for device {device_id}"
+            ) from err
 
         _LOGGER.debug("Manual update triggered for device %s", device_id)
-        await coordinator.manual_update_evse_status()
+        try:
+            await coordinator.manual_update_evse_status()
+        except Exception as err:
+            _LOGGER.error("Failed to update device status: %s", err)
+            raise
 
     hass.services.async_register(
         DOMAIN,

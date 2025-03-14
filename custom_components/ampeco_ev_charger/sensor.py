@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -25,6 +26,19 @@ from .const import DOMAIN, SENSOR_TYPE_CHARGER_STATUS, SENSOR_TYPE_CHARGING_SESS
 from .coordinator import EVChargerDataUpdateCoordinator
 
 
+def generate_slug(text: str) -> str:
+    """Generate a slug from a string.
+
+    Args:
+        text: The string to convert to a slug
+
+    Returns:
+        A lowercase string with non-alphanumeric characters removed
+    """
+    # Convert to lowercase and replace any non-alphanumeric characters with underscores
+    return re.sub(r"[^a-z0-9]", "_", text.lower())
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
@@ -32,18 +46,22 @@ async def async_setup_entry(
 ) -> None:
     """Set up the EV Charger sensors."""
     coordinator = hass.data[DOMAIN][config_entry.entry_id]
+    chargepoint_id = config_entry.data["chargepoint_id"]
+
+    # Create a slug from the chargepoint ID for use in entity IDs
+    chargepoint_slug = generate_slug(chargepoint_id)
 
     sensors = [
-        ChargerStatusSensor(coordinator),
-        ChargingSessionSensor(coordinator),
-        ChargingCurrentSensor(coordinator),
-        ChargingEnergySensor(coordinator),
-        ChargingDurationSensor(coordinator),
-        PollingIntervalSensor(coordinator),
-        EVSEStatusSensor(coordinator),
-        MaxCurrentSensor(coordinator),
-        LastMonthStatsSensor(coordinator),
-        SessionIDSensor(coordinator),
+        ChargerStatusSensor(coordinator, chargepoint_slug),
+        ChargingSessionSensor(coordinator, chargepoint_slug),
+        ChargingCurrentSensor(coordinator, chargepoint_slug),
+        ChargingEnergySensor(coordinator, chargepoint_slug),
+        ChargingDurationSensor(coordinator, chargepoint_slug),
+        PollingIntervalSensor(coordinator, chargepoint_slug),
+        EVSEStatusSensor(coordinator, chargepoint_slug),
+        MaxCurrentSensor(coordinator, chargepoint_slug),
+        LastMonthStatsSensor(coordinator, chargepoint_slug),
+        SessionIDSensor(coordinator, chargepoint_slug),
     ]
 
     async_add_entities(sensors)
@@ -53,37 +71,58 @@ class EVChargerBaseSensor(CoordinatorEntity, SensorEntity):
     """Base class for EV Charger sensors."""
 
     def __init__(
-        self, coordinator: EVChargerDataUpdateCoordinator, sensor_type: str
+        self,
+        coordinator: EVChargerDataUpdateCoordinator,
+        sensor_type: str,
+        chargepoint_slug: str,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._sensor_type = sensor_type
+        self._chargepoint_slug = chargepoint_slug
 
         # Get charger data
         charger_data = coordinator.data["status"]
         chargepoint_id = coordinator.config_entry.data["chargepoint_id"]
         evse_id = coordinator.config_entry.data["evse_id"]
 
+        # Store user-friendly name from config/charger data
+        self._charger_name = charger_data.get(
+            "name", f"AMPECO Charger {chargepoint_id}"
+        )
+
+        # Create a unique ID for this sensor (used internally by HA)
         self._attr_unique_id = f"{chargepoint_id}_{evse_id}_{sensor_type}"
+
+        # Set a custom entity ID for this sensor - this is what users will see as sensor.xyz
+        self.entity_id = f"sensor.evse_{chargepoint_slug}_{sensor_type}"
+
+        # Define a friendly display name
+        sensor_type_name = sensor_type.replace("_", " ").title()
+        self._attr_name = f"{self._charger_name} {sensor_type_name}"
+
+        # It's important that device_info identifiers remain consistent
+        # This is how services find the device when called with device_id
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, evse_id)},
-            name=charger_data.get("name", f"AMPECO EV Charger {chargepoint_id}"),
+            name=self._charger_name,
             manufacturer="AMPECO",
             model=charger_data.get("evses", [{}])[0]
             .get("connectors", [{}])[0]
             .get("name", "Unknown"),
             sw_version=charger_data.get("firmware_version"),
-            configuration_url=f"https://app.ampeco.global/chargers/{chargepoint_id}",  # Updated URL
+            configuration_url=f"https://app.ampeco.global/chargers/{chargepoint_id}",
         )
 
 
 class ChargerStatusSensor(EVChargerBaseSensor):
     """Sensor for charger status."""
 
-    def __init__(self, coordinator: EVChargerDataUpdateCoordinator) -> None:
+    def __init__(
+        self, coordinator: EVChargerDataUpdateCoordinator, chargepoint_slug: str
+    ) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, SENSOR_TYPE_CHARGER_STATUS)
-        self._attr_name = "Status"
+        super().__init__(coordinator, SENSOR_TYPE_CHARGER_STATUS, chargepoint_slug)
 
     @property
     def native_value(self):
@@ -109,10 +148,11 @@ class ChargerStatusSensor(EVChargerBaseSensor):
 class ChargingSessionSensor(EVChargerBaseSensor):
     """Sensor for charging session."""
 
-    def __init__(self, coordinator: EVChargerDataUpdateCoordinator) -> None:
+    def __init__(
+        self, coordinator: EVChargerDataUpdateCoordinator, chargepoint_slug: str
+    ) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, SENSOR_TYPE_CHARGING_SESSION)
-        self._attr_name = "Charging Session"
+        super().__init__(coordinator, SENSOR_TYPE_CHARGING_SESSION, chargepoint_slug)
         self._attr_device_class = SensorDeviceClass.POWER
         self._attr_state_class = SensorStateClass.MEASUREMENT
         self._attr_native_unit_of_measurement = UnitOfPower.KILO_WATT
@@ -155,10 +195,11 @@ class ChargingSessionSensor(EVChargerBaseSensor):
 class ChargingCurrentSensor(EVChargerBaseSensor):
     """Sensor for charging current."""
 
-    def __init__(self, coordinator: EVChargerDataUpdateCoordinator) -> None:
+    def __init__(
+        self, coordinator: EVChargerDataUpdateCoordinator, chargepoint_slug: str
+    ) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, "charging_current")
-        self._attr_name = "Charging Current"
+        super().__init__(coordinator, "charging_current", chargepoint_slug)
         self._attr_device_class = SensorDeviceClass.CURRENT
         self._attr_state_class = SensorStateClass.MEASUREMENT
         self._attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
@@ -172,10 +213,11 @@ class ChargingCurrentSensor(EVChargerBaseSensor):
 class ChargingEnergySensor(EVChargerBaseSensor):
     """Sensor for charging energy."""
 
-    def __init__(self, coordinator: EVChargerDataUpdateCoordinator) -> None:
+    def __init__(
+        self, coordinator: EVChargerDataUpdateCoordinator, chargepoint_slug: str
+    ) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, "charging_energy")
-        self._attr_name = "Charging Energy"
+        super().__init__(coordinator, "charging_energy", chargepoint_slug)
         self._attr_device_class = SensorDeviceClass.ENERGY
         self._attr_state_class = SensorStateClass.TOTAL_INCREASING
         self._attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
@@ -204,10 +246,11 @@ class ChargingEnergySensor(EVChargerBaseSensor):
 class ChargingDurationSensor(EVChargerBaseSensor):
     """Sensor for charging duration."""
 
-    def __init__(self, coordinator: EVChargerDataUpdateCoordinator) -> None:
+    def __init__(
+        self, coordinator: EVChargerDataUpdateCoordinator, chargepoint_slug: str
+    ) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, "charging_duration")
-        self._attr_name = "Charging Duration"
+        super().__init__(coordinator, "charging_duration", chargepoint_slug)
         self._attr_device_class = SensorDeviceClass.DURATION
         self._attr_native_unit_of_measurement = UnitOfTime.MINUTES
 
@@ -235,10 +278,11 @@ class ChargingDurationSensor(EVChargerBaseSensor):
 class PollingIntervalSensor(EVChargerBaseSensor):
     """Sensor for polling interval."""
 
-    def __init__(self, coordinator: EVChargerDataUpdateCoordinator) -> None:
+    def __init__(
+        self, coordinator: EVChargerDataUpdateCoordinator, chargepoint_slug: str
+    ) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, "polling_interval")
-        self._attr_name = "Polling Interval"
+        super().__init__(coordinator, "polling_interval", chargepoint_slug)
         self._attr_device_class = SensorDeviceClass.DURATION
         self._attr_native_unit_of_measurement = UnitOfTime.SECONDS
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
@@ -262,10 +306,11 @@ class PollingIntervalSensor(EVChargerBaseSensor):
 class EVSEStatusSensor(EVChargerBaseSensor):
     """Sensor for EVSE status."""
 
-    def __init__(self, coordinator: EVChargerDataUpdateCoordinator) -> None:
+    def __init__(
+        self, coordinator: EVChargerDataUpdateCoordinator, chargepoint_slug: str
+    ) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, "evse_status")
-        self._attr_name = "EVSE Status"
+        super().__init__(coordinator, "evse_status", chargepoint_slug)
         self._attr_icon = "mdi:ev-station"
         self._attr_entity_category = None  # This is important enough to show in main UI
 
@@ -280,10 +325,11 @@ class EVSEStatusSensor(EVChargerBaseSensor):
 class MaxCurrentSensor(EVChargerBaseSensor):
     """Sensor for maximum allowed current."""
 
-    def __init__(self, coordinator: EVChargerDataUpdateCoordinator) -> None:
+    def __init__(
+        self, coordinator: EVChargerDataUpdateCoordinator, chargepoint_slug: str
+    ) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, "max_current")
-        self._attr_name = "Maximum Current"
+        super().__init__(coordinator, "max_current", chargepoint_slug)
         self._attr_device_class = SensorDeviceClass.CURRENT
         self._attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
@@ -306,10 +352,11 @@ class MaxCurrentSensor(EVChargerBaseSensor):
 class LastMonthStatsSensor(EVChargerBaseSensor):
     """Sensor for last month's statistics."""
 
-    def __init__(self, coordinator: EVChargerDataUpdateCoordinator) -> None:
+    def __init__(
+        self, coordinator: EVChargerDataUpdateCoordinator, chargepoint_slug: str
+    ) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, "last_month_energy")
-        self._attr_name = "Last Month Energy"
+        super().__init__(coordinator, "last_month_energy", chargepoint_slug)
         self._attr_device_class = SensorDeviceClass.ENERGY
         self._attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
@@ -333,10 +380,11 @@ class LastMonthStatsSensor(EVChargerBaseSensor):
 class SessionIDSensor(EVChargerBaseSensor):
     """Sensor for active session ID."""
 
-    def __init__(self, coordinator: EVChargerDataUpdateCoordinator) -> None:
+    def __init__(
+        self, coordinator: EVChargerDataUpdateCoordinator, chargepoint_slug: str
+    ) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, "session_id")
-        self._attr_name = "Session ID"
+        super().__init__(coordinator, "session_id", chargepoint_slug)
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
         self._attr_entity_registry_enabled_default = False  # Hidden by default
         self._attr_icon = "mdi:identifier"
