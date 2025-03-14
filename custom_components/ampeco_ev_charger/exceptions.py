@@ -27,3 +27,7 @@ class RateLimitError(AmpecoEVChargerError):
 
 class ApiError(AmpecoEVChargerError):
     """Exception raised for general API errors."""
+
+
+class AlreadyChargingError(AmpecoEVChargerError):
+    """Exception raised when trying to start charging but a session is already active."""

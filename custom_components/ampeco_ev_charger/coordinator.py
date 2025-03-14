@@ -16,7 +16,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .const import DOMAIN, SCAN_INTERVAL, DEFAULT_TIMEOUT, IDLE_SCAN_INTERVAL
 from .api_client import EVChargerApiClient
 from .retry import AdaptivePollingStrategy
-from .exceptions import AuthenticationError, NoActiveSessionError
+from .exceptions import AuthenticationError, NoActiveSessionError, AlreadyChargingError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -117,11 +117,22 @@ class EVChargerDataUpdateCoordinator(DataUpdateCoordinator):
         _LOGGER.debug(
             f"Starting charging with EVSE ID: {evse_id}, max current: {max_current or 'default'}"
         )
-        result = await self.api_client.start_charging(evse_id, max_current)
-        self.polling_strategy.update_charging_state(True)
-        await self.async_refresh()
-        self._start_active_session_polling()
-        return result
+        try:
+            result = await self.api_client.start_charging(evse_id, max_current)
+            self.polling_strategy.update_charging_state(True)
+            await self.async_refresh()
+            self._start_active_session_polling()
+            return result
+        except AlreadyChargingError as err:
+            _LOGGER.info(
+                "Attempted to start charging but a session is already active: %s", err
+            )
+            # We still want to refresh data and start polling
+            self.polling_strategy.update_charging_state(True)
+            await self.async_refresh()
+            self._start_active_session_polling()
+            # Return the current session data
+            return self.data.get("session", {})
 
     async def stop_charging(self) -> dict[str, Any]:
         """Stop charging session."""

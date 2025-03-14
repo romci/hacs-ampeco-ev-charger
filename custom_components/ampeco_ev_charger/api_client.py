@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 
 from .base_api_client import BaseApiClient
-from .exceptions import ConnectionError
+from .exceptions import ConnectionError, AlreadyChargingError
 
 _LOGGER = logging.getLogger(__name__)
 # Uncomment this line to enable debug logging for this integration
@@ -85,19 +85,43 @@ class EVChargerApiClient(BaseApiClient):
             evse_id: The ID of the EVSE to start charging
             max_current: Optional maximum charging current in amperes (6-32A)
         """
+        # First check if there's already an active session
+        active_session = await self.get_active_session()
+        if active_session and active_session.get("session"):
+            session_data = active_session.get("session", {})
+            session_id = session_data.get("id")
+            _LOGGER.info(
+                "Session already active with ID: %s, returning existing session data",
+                session_id,
+            )
+            self._active_session_id = session_id
+            return session_data
+
         payload = {"evseId": evse_id}
 
         # Add max_current to the payload if provided
         if max_current is not None:
             payload["maxCurrent"] = max_current
 
-        response = await self._make_request(
-            "POST", "app/session/start", headers=self._headers, json_data=payload
-        )
-        session_data = response.get("session", {})
-        if session_data:
-            self._active_session_id = session_data.get("id")
-        return session_data
+        try:
+            response = await self._make_request(
+                "POST", "app/session/start", headers=self._headers, json_data=payload
+            )
+            session_data = response.get("session", {})
+            if session_data:
+                self._active_session_id = session_data.get("id")
+            return session_data
+        except AlreadyChargingError:
+            # If we get here, our initial check missed an active session
+            # Try to get the session data again
+            _LOGGER.info("Got AlreadyChargingError, fetching current session data")
+            active_session = await self.get_active_session()
+            if active_session and active_session.get("session"):
+                session_data = active_session.get("session", {})
+                self._active_session_id = session_data.get("id")
+                return session_data
+            # If we still can't find a session, re-raise the error
+            raise
 
     async def stop_charging(self) -> dict[str, Any]:
         """Stop charging session."""

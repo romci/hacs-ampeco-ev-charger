@@ -22,6 +22,7 @@ from .const import (
     SERVICE_STOP_CHARGING,
 )
 from .coordinator import EVChargerDataUpdateCoordinator
+from .exceptions import AlreadyChargingError
 
 PLATFORMS: list[Platform] = [
     Platform.SENSOR,
@@ -140,6 +141,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         try:
             await coordinator.start_charging(evse_id, max_current)
+        except AlreadyChargingError as err:
+            # This is now handled in the coordinator, just log it
+            _LOGGER.info("Charging session already active: %s", err)
         except Exception as err:
             _LOGGER.error("Failed to start charging: %s", err)
             raise
