@@ -3,7 +3,7 @@
 from datetime import timedelta, datetime
 import logging
 import asyncio
-from typing import Any
+from typing import Any, Optional
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
@@ -110,9 +110,19 @@ class EVChargerDataUpdateCoordinator(DataUpdateCoordinator):
             await self.polling_strategy.handle_error(err)
             raise UpdateFailed(f"Update failed: {err}") from err
 
-    async def start_charging(self, evse_id: str) -> dict[str, Any]:
-        """Start charging session."""
-        result = await self.api_client.start_charging(evse_id)
+    async def start_charging(
+        self, evse_id: str, max_current: Optional[int] = None
+    ) -> dict[str, Any]:
+        """Start charging session.
+
+        Args:
+            evse_id: The ID of the EVSE to start charging
+            max_current: Optional maximum charging current in amperes (6-32A)
+        """
+        _LOGGER.debug(
+            f"Starting charging with EVSE ID: {evse_id}, max current: {max_current or 'default'}"
+        )
+        result = await self.api_client.start_charging(evse_id, max_current)
         self.polling_strategy.update_charging_state(True)
         await self.async_refresh()
         self._start_active_session_polling()

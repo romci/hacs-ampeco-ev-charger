@@ -9,7 +9,7 @@
   "zeroconf": [],
   "homekit": {},
   "dependencies": [],
-  "codeowners": ["@roman-avsec"],
+  "codeowners": ["@romci"],
   "iot_class": "cloud_polling",
   "version": "0.1.0",
   "license": "GPL-3.0"

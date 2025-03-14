@@ -12,6 +12,8 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr, config_validation as cv
+from homeassistant.helpers.entity_platform import async_get_platforms
+from homeassistant.helpers.service import verify_domain_control
 
 from .const import (
     DOMAIN,
@@ -27,9 +29,10 @@ PLATFORMS: list[Platform] = [
 
 _LOGGER = logging.getLogger(__name__)
 
-SERVICE_SCHEMA = vol.Schema(
+# Schema for service data, including device_id for direct service calls
+SERVICE_DATA_SCHEMA = vol.Schema(
     {
-        vol.Required("device_id"): cv.string,
+        vol.Optional("device_id"): cv.string,
         vol.Optional("max_current"): vol.All(vol.Coerce(int), vol.Range(min=6, max=32)),
     }
 )
@@ -49,11 +52,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Register services
     async def handle_start_charging(call: ServiceCall) -> None:
         """Handle the start charging service call."""
-        device_id = call.data["device_id"]
+        _LOGGER.debug("Start charging service called with: %s", call.data)
+
+        # Get device_id from call data
+        device_id = call.data.get("device_id")
+        if not device_id:
+            _LOGGER.error("No device_id provided in service call")
+            raise ValueError("No device_id provided in service call data")
+
         device_registry = dr.async_get(hass)
         device = device_registry.async_get(device_id)
 
         if not device:
+            _LOGGER.error("Device %s not found", device_id)
             raise ValueError(f"Device {device_id} not found")
 
         # Get the coordinator for this device
@@ -65,17 +76,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             (ident[1] for ident in device.identifiers if ident[0] == DOMAIN), None
         )
         if not evse_id:
+            _LOGGER.error("No EVSE ID found for device %s", device_id)
             raise ValueError(f"No EVSE ID found for device {device_id}")
 
-        await coordinator.start_charging(evse_id)
+        # Get max_current from call data if provided
+        max_current = call.data.get("max_current")
+        _LOGGER.debug("Starting charging with max_current: %s", max_current)
+
+        await coordinator.start_charging(evse_id, max_current)
 
     async def handle_stop_charging(call: ServiceCall) -> None:
         """Handle the stop charging service call."""
-        device_id = call.data["device_id"]
+        _LOGGER.debug("Stop charging service called with: %s", call.data)
+
+        # Get device_id from call data
+        device_id = call.data.get("device_id")
+        if not device_id:
+            _LOGGER.error("No device_id provided in service call")
+            raise ValueError("No device_id provided in service call data")
+
         device_registry = dr.async_get(hass)
         device = device_registry.async_get(device_id)
 
         if not device:
+            _LOGGER.error("Device %s not found", device_id)
             raise ValueError(f"Device {device_id} not found")
 
         # Get the coordinator for this device
@@ -85,24 +109,49 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await coordinator.stop_charging()
 
     async def handle_update_data(call: ServiceCall) -> None:
-        """Handle the service call."""
-        _LOGGER.debug("Manual update triggered")
+        """Handle the update data service call."""
+        _LOGGER.debug("Update data service called with: %s", call.data)
+
+        # Get device_id from call data
+        device_id = call.data.get("device_id")
+        if not device_id:
+            _LOGGER.error("No device_id provided in service call")
+            raise ValueError("No device_id provided in service call data")
+
+        device_registry = dr.async_get(hass)
+        device = device_registry.async_get(device_id)
+
+        if not device:
+            _LOGGER.error("Device %s not found", device_id)
+            raise ValueError(f"Device {device_id} not found")
+
+        # Get the coordinator for this device
+        entry_id = next(iter(device.config_entries))
+        coordinator = hass.data[DOMAIN][entry_id]
+
+        _LOGGER.debug("Manual update triggered for device %s", device_id)
         await coordinator.manual_update_evse_status()
 
     hass.services.async_register(
         DOMAIN,
         SERVICE_START_CHARGING,
         handle_start_charging,
-        schema=SERVICE_SCHEMA,
+        schema=SERVICE_DATA_SCHEMA,
     )
 
     hass.services.async_register(
         DOMAIN,
         SERVICE_STOP_CHARGING,
         handle_stop_charging,
+        schema=SERVICE_DATA_SCHEMA,
     )
 
-    hass.services.async_register(DOMAIN, "update_data", handle_update_data)
+    hass.services.async_register(
+        DOMAIN,
+        "update_data",
+        handle_update_data,
+        schema=SERVICE_DATA_SCHEMA,
+    )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 

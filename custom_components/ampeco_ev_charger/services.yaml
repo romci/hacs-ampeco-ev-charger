@@ -1,11 +1,14 @@
 start_charging:
   name: Start Charging
   description: Start a charging session
-  target:
-    entity:
-      integration: ampeco_ev_charger
-      domain: sensor
   fields:
+    device_id:
+      name: Device ID
+      description: The ID of the EV charger device to start charging
+      required: true
+      selector:
+        device:
+          integration: ampeco_ev_charger
     max_current:
       name: Maximum Current
       description: Maximum charging current in amperes
@@ -19,14 +22,23 @@ start_charging:
 stop_charging:
   name: Stop Charging
   description: Stop the current charging session
-  target:
-    entity:
-      integration: ampeco_ev_charger
-      domain: sensor
+  fields:
+    device_id:
+      name: Device ID
+      description: The ID of the EV charger device to stop charging
+      required: true
+      selector:
+        device:
+          integration: ampeco_ev_charger
 
 update_data:
   name: Update Data
   description: Manually trigger a data update from the AMPECO EV Charger.
-  target:
-    entity:
-      integration: ampeco_ev_charger
+  fields:
+    device_id:
+      name: Device ID
+      description: The ID of the EV charger device to update
+      required: true
+      selector:
+        device:
+          integration: ampeco_ev_charger

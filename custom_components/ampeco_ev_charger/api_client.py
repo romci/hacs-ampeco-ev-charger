@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import aiohttp
 import async_timeout
-from typing import Any
+from typing import Any, Optional
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -61,10 +61,23 @@ class EVChargerApiClient(BaseApiClient):
             self._active_session_id = None
             return {}
 
-    async def start_charging(self, evse_id: str) -> dict[str, Any]:
-        """Start charging session."""
+    async def start_charging(
+        self, evse_id: str, max_current: Optional[int] = None
+    ) -> dict[str, Any]:
+        """Start charging session.
+
+        Args:
+            evse_id: The ID of the EVSE to start charging
+            max_current: Optional maximum charging current in amperes (6-32A)
+        """
+        payload = {"evseId": evse_id}
+
+        # Add max_current to the payload if provided
+        if max_current is not None:
+            payload["maxCurrent"] = max_current
+
         response = await self._make_request(
-            "POST", "app/session/start", {"evseId": evse_id}
+            "POST", "app/session/start", headers=self._headers, json_data=payload
         )
         session_data = response.get("session", {})
         if session_data:
@@ -77,7 +90,7 @@ class EVChargerApiClient(BaseApiClient):
             raise HomeAssistantError("No active charging session to stop")
 
         response = await self._make_request(
-            "POST", f"app/session/{self._active_session_id}/end"
+            "POST", f"app/session/{self._active_session_id}/end", headers=self._headers
         )
         session_data = response.get("session", {})
         self._active_session_id = None

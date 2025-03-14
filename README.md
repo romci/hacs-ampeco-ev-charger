@@ -39,7 +39,7 @@ Two main services are provided:
 
 ### HACS Installation (Recommended)
 1. Add this repository to HACS as a custom repository
-   - Repository: `roman-avsec/hacs-ampeco-ev-charger`
+   - Repository: `romci/hacs-ampeco-ev-charger`
    - Category: `Integration`
 2. Install the integration through HACS
 3. Restart Home Assistant
