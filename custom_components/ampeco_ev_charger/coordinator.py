@@ -67,47 +67,16 @@ class EVChargerDataUpdateCoordinator(DataUpdateCoordinator):
             evse = charger_status.get("data", {}).get("evses", [{}])[0]
             evse_status = evse.get("status", "unknown")
 
-            active_session = {}
-            session_from_chargepoint = evse.get("session", {})
+            # Get session data directly from charge_point info
+            active_session = await self.api_client.get_active_session()
+            has_session = bool(active_session.get("session", {}))
 
-            # Check if there's a session in the charge_point info
-            if session_from_chargepoint and "id" in session_from_chargepoint:
-                _LOGGER.debug(
-                    "Found session in charge_point info: %s",
-                    session_from_chargepoint["id"],
-                )
-                # Store this session ID in the client for potential stop_charging operations
-                self.api_client._active_session_id = session_from_chargepoint["id"]
-
-                # For "charging" state, still try to get the full session data from the active endpoint
-                if evse_status == "charging":
-                    _LOGGER.debug("Charger is charging, fetching active session")
-                    try:
-                        active_session = await self.api_client.get_active_session()
-                        self._start_active_session_polling()
-                    except Exception as err:
-                        _LOGGER.debug(
-                            "Failed to get active session despite charging status: %s. Using session from charge_point.",
-                            str(err),
-                        )
-                        # Use the session from charge_point info as fallback
-                        active_session = {"session": session_from_chargepoint}
-                        self._start_active_session_polling()
-                # For "preparing" state, use the session from charge_point info
-                elif evse_status == "preparing":
-                    _LOGGER.debug(
-                        "Charger is preparing, using session from charge_point info"
-                    )
-                    active_session = {"session": session_from_chargepoint}
-                    self._start_active_session_polling()
-                else:
-                    _LOGGER.debug(
-                        "Charger not charging or preparing, using session from charge_point for tracking"
-                    )
-                    active_session = {"session": session_from_chargepoint}
-                    self._stop_active_session_polling()
+            # Start or stop session polling based on EVSE status and session existence
+            if has_session and evse_status in ["charging", "preparing"]:
+                _LOGGER.debug("Active session detected with status: %s", evse_status)
+                self._start_active_session_polling()
             else:
-                _LOGGER.debug("No session found in charge_point info")
+                _LOGGER.debug("No active charging session or status is inactive")
                 self._stop_active_session_polling()
 
             # Update polling strategy based on charging status
@@ -191,79 +160,31 @@ class EVChargerDataUpdateCoordinator(DataUpdateCoordinator):
         while self._active_session_running:
             try:
                 _LOGGER.debug("Fetching active session data")
-                try:
-                    active_session = await self.api_client.get_active_session()
-                    if active_session and active_session.get("session"):
-                        self.data["session"] = active_session.get("session", {})
-                        self.async_set_updated_data(self.data)
-                    else:
-                        # If active_session endpoint doesn't return data, check charge_point info
-                        _LOGGER.debug(
-                            "No data from active session endpoint, checking charge_point info"
-                        )
-                        charger_status = await self.api_client.get_charger_status()
-                        evse = charger_status.get("data", {}).get("evses", [{}])[0]
-                        evse_status = evse.get("status", "unknown")
-                        session_from_chargepoint = evse.get("session", {})
+                active_session = await self.api_client.get_active_session()
 
-                        if (
-                            session_from_chargepoint
-                            and "id" in session_from_chargepoint
-                        ):
-                            _LOGGER.debug(
-                                "Using session from charge_point info: %s",
-                                session_from_chargepoint["id"],
-                            )
-                            self.api_client._active_session_id = (
-                                session_from_chargepoint["id"]
-                            )
-                            self.data["session"] = session_from_chargepoint
-                            self.async_set_updated_data(self.data)
+                if active_session and active_session.get("session"):
+                    session_data = active_session.get("session", {})
+                    self.data["session"] = session_data
+                    self.async_set_updated_data(self.data)
 
-                            # If not in a charging or preparing state but we have a session, the session might have ended
-                            if evse_status not in ["charging", "preparing"]:
-                                _LOGGER.debug(
-                                    "EVSE not in charging/preparing state - session might have ended"
-                                )
-                                self._stop_active_session_polling()
-                                await self.async_refresh()
-                                break
-                        else:
-                            _LOGGER.debug(
-                                "No session found in charge_point info, stopping polling"
-                            )
-                            self._stop_active_session_polling()
-                            await self.async_refresh()
-                            break
-                except NoActiveSessionError:
-                    # Check charge_point info as a fallback
-                    _LOGGER.debug("No active session found, checking charge_point info")
+                    # Check if still in a charging state
                     charger_status = await self.api_client.get_charger_status()
                     evse = charger_status.get("data", {}).get("evses", [{}])[0]
                     evse_status = evse.get("status", "unknown")
-                    session_from_chargepoint = evse.get("session", {})
 
-                    if (
-                        session_from_chargepoint
-                        and "id" in session_from_chargepoint
-                        and evse_status in ["charging", "preparing"]
-                    ):
+                    if evse_status not in ["charging", "preparing"]:
                         _LOGGER.debug(
-                            "Found active session in charge_point info, status: %s",
-                            evse_status,
-                        )
-                        self.api_client._active_session_id = session_from_chargepoint[
-                            "id"
-                        ]
-                        self.data["session"] = session_from_chargepoint
-                        self.async_set_updated_data(self.data)
-                    else:
-                        _LOGGER.debug(
-                            "Active session ended, stopping active session polling"
+                            "EVSE not in charging/preparing state - session might have ended"
                         )
                         self._stop_active_session_polling()
                         await self.async_refresh()
                         break
+                else:
+                    _LOGGER.debug("No session found, stopping active session polling")
+                    self._stop_active_session_polling()
+                    await self.async_refresh()
+                    break
+
             except AuthenticationError as err:
                 _LOGGER.error(
                     "Authentication failed during active session polling: %s", str(err)

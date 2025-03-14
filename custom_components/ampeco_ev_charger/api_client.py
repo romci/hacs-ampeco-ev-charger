@@ -47,17 +47,28 @@ class EVChargerApiClient(BaseApiClient):
         )
 
     async def get_active_session(self) -> dict[str, Any]:
-        """Get active charging session."""
+        """Get active charging session from charge point info.
+
+        The app/session/active endpoint is no longer available, so we retrieve
+        session data directly from the charge point info.
+        """
         try:
-            response = await self._make_request(
-                "GET",
-                "app/session/active",
-                headers=self._headers,
-            )
-            session_data = response.get("session", {})
-            self._active_session_id = session_data.get("id") if session_data else None
-            return session_data
-        except ConnectionError:
+            charger_status = await self.get_charger_status()
+            evse = charger_status.get("data", {}).get("evses", [{}])[0]
+            session_data = evse.get("session", {})
+
+            if session_data and "id" in session_data:
+                _LOGGER.debug(
+                    "Found session in charge point info: %s", session_data["id"]
+                )
+                self._active_session_id = session_data["id"]
+                return {"session": session_data}
+            else:
+                _LOGGER.debug("No session found in charge point info")
+                self._active_session_id = None
+                return {}
+        except Exception as err:
+            _LOGGER.error("Failed to get session from charge point info: %s", str(err))
             self._active_session_id = None
             return {}
 
@@ -87,28 +98,11 @@ class EVChargerApiClient(BaseApiClient):
     async def stop_charging(self) -> dict[str, Any]:
         """Stop charging session."""
         if not self._active_session_id:
-            # Try to get session ID from charge_point info if not available
-            _LOGGER.debug(
-                "No active session ID found, attempting to get from charge_point info"
-            )
-            try:
-                charger_status = await self.get_charger_status()
-                evse = charger_status.get("data", {}).get("evses", [{}])[0]
+            # Get the latest session info directly
+            await self.get_active_session()
 
-                # Check if there's a session in the EVSE (even if it's in "preparing" state)
-                if evse.get("session", {}).get("id"):
-                    _LOGGER.debug(
-                        "Found session ID from charge_point info: %s",
-                        evse["session"]["id"],
-                    )
-                    self._active_session_id = evse["session"]["id"]
-                else:
-                    raise HomeAssistantError("No active charging session to stop")
-            except Exception as err:
-                _LOGGER.error(
-                    "Failed to get session from charge_point info: %s", str(err)
-                )
-                raise HomeAssistantError("No active charging session to stop") from err
+            if not self._active_session_id:
+                raise HomeAssistantError("No active charging session to stop")
 
         try:
             response = await self._make_request(
